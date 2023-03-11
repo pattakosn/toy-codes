@@ -38,8 +38,8 @@ static void AxEQb_LU(benchmark::State &state)
 	}
 }
 //BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->DenseRange(64, 4*1024, 64)->UseRealTime()->Unit(benchmark::kMillisecond)->Threads(4);
-//BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 4*1024)->UseRealTime()->Unit(benchmark::kMillisecond);
-BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
+BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 2*1024)->UseRealTime()->Unit(benchmark::kMillisecond);
+//BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 //BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 //BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 
