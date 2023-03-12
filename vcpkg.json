@@ -1,0 +1,15 @@
+{
+  "name" : "toy-codes",
+  "version-string" : "1.0.0",
+  "builtin-baseline" : "716c3524a54f1f50a25d16a4cdd360f5a7fcc150",
+  "dependencies" : [ {
+    "name" : "benchmark",
+    "version>=" : "1.7.1"
+  }, {
+    "name" : "eigen3",
+    "version>=" : "3.4.0#2"
+  }, {
+    "name" : "boost-algorithm",
+    "version>=" : "1.80.0#1"
+  } ]
+}
