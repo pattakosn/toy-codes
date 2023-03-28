@@ -34,5 +34,16 @@ find_package(benchmark CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(OpenMP REQUIRED)
 
+check_language(CUDA)
+if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+
+    # to tell your code it was found via #ifdef USE_CUDA:
+    add_definitions(-DUSE_CUDA)
+
+    include_directories("${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+    #ADD THIS TO REQUIRED TARGETS:    set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES "35;50;72")
+endif()
+
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
