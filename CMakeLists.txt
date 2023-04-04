@@ -1,6 +1,6 @@
 # bale kai ena cpp me ekeino to problhma poy koitoyses shmera: string trimming white space
-cmake_minimum_required(VERSION 3.20)
-project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy codes" LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.26)
+project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy codes" LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
@@ -34,16 +34,41 @@ find_package(benchmark CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(OpenMP REQUIRED)
 
-check_language(CUDA)
+#include(CheckLanguage)
+#check_language(CUDA)
+#CMAKE_CUDA_FLAGS to –cudart { none | shared | static }
 if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    message("[CUDA] CUDA found and will be used")
+    message("[CUDA] CMAKE_CUDA_COMPILER: " ${CMAKE_CUDA_COMPILER})
+    message("[CUDA] CUDA_INCLUDE_DIRS: " ${CUDA_INCLUDE_DIRS})
+    message("[CUDA] CUDA_LIBRARIES: " ${CUDA_LIBRARIES})
 
     # to tell your code it was found via #ifdef USE_CUDA:
     add_definitions(-DUSE_CUDA)
 
-    include_directories("${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
-    #ADD THIS TO REQUIRED TARGETS:    set_target_properties(${PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES "35;50;72")
+    find_package(CUDAToolkit)
+    if(CUDAToolkit_FOUND)
+        message("[CUDA] CUDAToolkit version " ${CUDAToolkit_VERSION} " found")
+	#target_link_libraries(project CUDA::cudart)
+	#target_link_libraries(project CUDA::cuda_driver)
+        #include_directories("${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+    endif()
 endif()
+# This is a CUDA helper function that might be useful, found on stackoverflow and I liked the idea.
+function(CUDA_CONVERT_FLAGS EXISTING_TARGET)
+    get_property(old_flags TARGET ${EXISTING_TARGET} PROPERTY INTERFACE_COMPILE_OPTIONS)
+    if(NOT "${old_flags}" STREQUAL "")
+	message(WARNING "        [CUDA] pre CUDA transform options: " ${old_flags})
+        string(REPLACE ";" "," CUDA_flags "${old_flags}")
+        set_property(TARGET ${EXISTING_TARGET} PROPERTY INTERFACE_COMPILE_OPTIONS
+            "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${old_flags}>$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:-Xcompil    er=${CUDA_flags}>"
+            )
+    message(WARNING "        [CUDA] post CUDA transform options: " ${old_flags})
+    endif()
+endfunction()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 

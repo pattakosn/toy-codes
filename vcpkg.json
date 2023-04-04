@@ -10,6 +10,6 @@
     "version>=" : "3.4.0#2"
   }, {
     "name" : "boost-algorithm",
-    "version>=" : "1.80.0#1"
+    "version>=" : "1.81.0#2"
   } ]
 }
