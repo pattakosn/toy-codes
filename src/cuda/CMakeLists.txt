@@ -34,5 +34,12 @@ else()
     set_target_properties(bench_cuda_init_to_0
         PROPERTIES
         CUDA_ARCHITECTURES native
-)
+    )
+
+    add_executable(bench_cuda_grid_stride grid-stride.cu)
+    target_link_libraries(bench_cuda_grid_stride PRIVATE benchmark::benchmark benchmark::benchmark_main)
+    set_target_properties(bench_cuda_grid_stride
+        PROPERTIES
+        CUDA_ARCHITECTURES native
+    )
 endif()
