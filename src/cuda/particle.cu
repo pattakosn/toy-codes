@@ -25,7 +25,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <particle.h>
-
+namespace lala::lolo {
 particle::particle() : 	position(), velocity(), totalDistance(0,0,0)
 {}
 
@@ -48,3 +48,4 @@ void particle::advance(float d)
 const v3& particle::getTotalDistance() const
 {	return totalDistance; }
 
+}

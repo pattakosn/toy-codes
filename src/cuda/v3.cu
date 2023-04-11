@@ -26,7 +26,9 @@
  */
 #include <cstdlib>
 #include <cmath>
-#include <v3.h>
+#include "v3.h"
+
+namespace lala::lolo {
 
 v3::v3()
 {	randomize(); }
@@ -57,4 +59,5 @@ __host__ __device__ void v3::scramble()
 	x = tx;
 	y = ty;
 	z = tz;
+}
 }

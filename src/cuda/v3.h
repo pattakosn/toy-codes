@@ -28,6 +28,7 @@
 #define __v3_h__
 #include "cuda_runtime.h"
 
+namespace lala::lolo {
 class v3
 {
 public:
@@ -42,5 +43,5 @@ public:
 	__host__ __device__ void scramble();
 
 };
-
+}
 #endif

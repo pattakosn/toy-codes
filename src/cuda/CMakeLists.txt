@@ -1,13 +1,15 @@
 if(NOT CMAKE_CUDA_COMPILER)
     message(WARNING "CUDA not found, skipping cuda test")
 else()
-    add_executable(cuda_test main.cu particle.cu particle.h v3.cu v3.h)
+    add_executable(cuda_test nvidia-seperate-compilation.cu particle.cu particle.h v3.cu v3.h)
     set_target_properties(cuda_test
         PROPERTIES
 #        #CUDA_ARCHITECTURES "35;50;72;75"
         CUDA_ARCHITECTURES native
         CUDA_SEPARABLE_COMPILATION ON
         POSITION_INDEPENDENT_CODE ON
+        CXX_STANDARD 17
+        CUDA_STANDARD 17
 )
 #target_link_libraries(cuda_test)# PRIVATE benchmark::benchmark benchmark::benchmark_main)
      target_include_directories(cuda_test

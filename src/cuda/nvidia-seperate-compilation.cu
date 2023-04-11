@@ -32,6 +32,8 @@
 #include <stdio.h>
 #include <cmath>
 
+using namespace lala::lolo;
+
 __global__ void advanceParticles(float dt, particle * pArray, int nParticles)
 {
 	int idx = threadIdx.x + blockIdx.x*blockDim.x;

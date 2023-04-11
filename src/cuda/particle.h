@@ -27,8 +27,8 @@
 #ifndef __particle_h__
 #define __particle_h__
 
-#include <v3.h>
-
+#include "v3.h"
+namespace lala::lolo {
 class particle
 {
 	private:
@@ -42,6 +42,6 @@ class particle
 		const v3& getTotalDistance() const;
 
 };
-
+}
 #endif
 
