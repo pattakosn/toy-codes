@@ -36,39 +36,45 @@ find_package(OpenMP REQUIRED)
 
 #include(CheckLanguage)
 #check_language(CUDA)
-#CMAKE_CUDA_FLAGS to –cudart { none | shared | static }
 if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
-    set(CMAKE_CUDA_STANDARD 17)
-    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    if(NOT DEFINED CMAKE_CUDA_STANDARD)
+        set(CMAKE_CUDA_STANDARD 17)
+	set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    endif()
+    set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+    set(CMAKE_CUDA_ARCHITECTURES native)
+    #CMAKE_CUDA_FLAGS to –cudart { none | shared | static }
+    #set(CMAKE_CUDA_FLAGS "-Wall")
+
     message("[CUDA] CUDA found and will be used")
     message("[CUDA] CMAKE_CUDA_COMPILER: " ${CMAKE_CUDA_COMPILER})
     message("[CUDA] CUDA_INCLUDE_DIRS: " ${CUDA_INCLUDE_DIRS})
     message("[CUDA] CUDA_LIBRARIES: " ${CUDA_LIBRARIES})
 
-    # to tell your code it was found via #ifdef USE_CUDA:
-    add_definitions(-DUSE_CUDA)
+    # ifdef USE_CUDA:
+    #add_definitions(-DUSE_CUDA)
 
     find_package(CUDAToolkit)
     if(CUDAToolkit_FOUND)
         message("[CUDA] CUDAToolkit version " ${CUDAToolkit_VERSION} " found")
-	#target_link_libraries(project CUDA::cudart)
-	#target_link_libraries(project CUDA::cuda_driver)
-        #include_directories("${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
     endif()
+
+    # CUDA helper function to convert an existing un-aliased target name's compiler options to correctly work with nvcc/native copiler
+    # found on stackoverflow or here https://cliutils.gitlab.io/modern-cmake/chapters/packages/CUDA.html
+    # and I liked the idea
+    function(CUDA_CONVERT_FLAGS EXISTING_TARGET)
+    	get_property(old_flags TARGET ${EXISTING_TARGET} PROPERTY INTERFACE_COMPILE_OPTIONS)
+    	if(NOT "${old_flags}" STREQUAL "")
+    	    message(WARNING "[CUDA] pre CUDA transform options: " ${old_flags})
+    	    string(REPLACE ";" "," CUDA_flags "${old_flags}")
+    	    set_property(TARGET ${EXISTING_TARGET} PROPERTY INTERFACE_COMPILE_OPTIONS
+    	        "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${old_flags}>$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:-Xcompiler=${CUDA_flags}>"
+    	        )
+    		message(WARNING "[CUDA] post CUDA transform options: " ${old_flags})
+    	endif()
+    endfunction()
 endif()
-# This is a CUDA helper function that might be useful, found on stackoverflow and I liked the idea.
-function(CUDA_CONVERT_FLAGS EXISTING_TARGET)
-    get_property(old_flags TARGET ${EXISTING_TARGET} PROPERTY INTERFACE_COMPILE_OPTIONS)
-    if(NOT "${old_flags}" STREQUAL "")
-	message(WARNING "        [CUDA] pre CUDA transform options: " ${old_flags})
-        string(REPLACE ";" "," CUDA_flags "${old_flags}")
-        set_property(TARGET ${EXISTING_TARGET} PROPERTY INTERFACE_COMPILE_OPTIONS
-            "$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CXX>>:${old_flags}>$<$<BUILD_INTERFACE:$<COMPILE_LANGUAGE:CUDA>>:-Xcompil    er=${CUDA_flags}>"
-            )
-    message(WARNING "        [CUDA] post CUDA transform options: " ${old_flags})
-    endif()
-endfunction()
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/src)
 
