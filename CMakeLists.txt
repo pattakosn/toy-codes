@@ -1,7 +1,7 @@
 # bale kai ena cpp me ekeino to problhma poy koitoyses shmera: string trimming white space
 cmake_minimum_required(VERSION 3.25)
 project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy codes" LANGUAGES CXX CUDA)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
@@ -39,7 +39,7 @@ find_package(OpenMP REQUIRED)
 if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
-        set(CMAKE_CUDA_STANDARD 17)
+        set(CMAKE_CUDA_STANDARD 20)
 	set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
     set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)

@@ -7,8 +7,8 @@ else()
         CUDA_ARCHITECTURES native
         CUDA_SEPARABLE_COMPILATION ON
         POSITION_INDEPENDENT_CODE ON
-        CXX_STANDARD 17
-        CUDA_STANDARD 17
+        CXX_STANDARD 20
+        CUDA_STANDARD 20
     )
     target_include_directories(cuda_test
 	     PRIVATE
@@ -47,4 +47,8 @@ else()
         PROPERTIES
         CUDA_ARCHITECTURES native
     )
+
+    add_executable(cuda_mandelbrot cuda_mandelbrot.cu)
+    #target_link_libraries(cuda_mandelbrot PRIVATE benchmark::benchmark benchmark::benchmark_main)
+    target_compile_definitions(cuda_mandelbrot PRIVATE BENCHMARK)
 endif()

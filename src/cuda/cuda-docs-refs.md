@@ -32,7 +32,7 @@
         - Kepler architecture (e.g. generic Kepler, GeForce 700, GT-730).
         - Adds support for unified memory programming
         - Completely dropped from CUDA 11 onwards.
-    
+
     - *SM35 or SM\_35, compute\_35*
         - Tesla K40
         - Adds support for dynamic parallelism.
@@ -60,7 +60,7 @@
         - Quadro GP100, Tesla P100, DGX-1 (Generic Pascal)
     SM61 or SM_61, compute_61–
     GTX 1080, GTX 1070, GTX 1060, GTX 1050, GTX 1030 (GP108), GT 1010 (GP108) Titan Xp, Tesla P40, Tesla P4, Discrete GPU on the NVIDIA Drive PX2
-    SM62 or SM_62, compute_62 – 
+    SM62 or SM_62, compute_62 –
     Integrated GPU on the NVIDIA Drive PX2, Tegra (Jetson) TX2
 
 * Volta
@@ -77,7 +77,7 @@
     - *SM75 or SM\_75, compute\_75*
         - GTX/RTX Turing – GTX 1660 Ti, RTX 2060, RTX 2070, RTX 2080, Titan RTX, Quadro RTX 4000, Quadro RTX 5000, Quadro RTX 6000, Quadro RTX 8000, Quadro T1000/T2000, Tesla T4
 
-* Ampere 
+* Ampere
     - CUDA 11.1+
 
     - *SM80 or SM\_80, compute\_80*
@@ -101,4 +101,29 @@
         - NVIDIA H100 (GH100)
     - *SM90a or SM\_90a, compute\_90a* for PTX ISA version 8.0
        - adds acceleration for features like wgmma and setmaxnreg. This is required for NVIDIA CUTLASS
+
+# CUDA basics reminder
+* Streaming Multiprocessors (SMs) > Streaming Processors(SPs)
+* SMX: Kepler Streaming Multiprocessor
+    * GK110
+    * 192 single-precision CUDA cores
+    *  64 double-precision units
+    *  32 special function units
+    *  32 load/store units
+
+* warp size: 32 ie 32threads
+    Each SM has at least one warp scheduler, which is responsible for executing 32 threads. Depending on the model of GPU, the cores may be double or quadruple pumped so that they execute one instruction on two or four threads in as many clock cycles. For instance, Tesla devices use a group of 8 quadpumped cores to execute a single warp. If there are less than 32 threads scheduled in the warp, it will still take as long to execute the instructions
+
+* kernel = a grid of blocks. each block is assigned to a SM and its threads are split into warps
+
+* CUDA on chip memory is divided into several different regions
+
+    - Registers act the same way that registers on CPUs do, each thread has it’s own set of registers.
+    - Local Memory local variables used by each thread. They are not accessible by other threads even though they use the same L1 and L2 cache as global memory.
+    - Shared Memory is accessible by all threads in a block. It must be declared using the __shared__ modifier. It has a higher bandwidth and lower latency than global memory. However, if multiple threads request the same address, the requests are processed serially, which slows down the application.
+    - Constant Memory is read-accessible by all threads and must be declared with the __const__ modifier. In newer devices there is a separate read only constant cache.
+    - Global Memory is accessible by all threads. It’s the slowest device memory, but on new cards, it is cached. Memory is pulled in 32, 64, or 128 byte memory transactions. Warps executing global memory accesses attempt to pull all the data from global memory simultaneously therefore it’s advantageous to use block sizes that are multiples of 32. If multidimensional arrays are used, it’s also advantageous to have the bounds padded so that they are multiples of 32
+    - Texture/Surface Memory is read-accesible by all threads, but unlike Constant Memory, it is optimized for 2D spacial locality, and cache hits pull in surrounding values in both x and y directions.
+
+[Memory Hierarchy](memheirarchy.png)
 

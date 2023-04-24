@@ -1,14 +1,14 @@
 // https://riptutorial.com/cuda/example/32764/very-simple-cuda-code
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "cuda.h"
+#include <cuda.h>
+#include <device_launch_parameters.h>
 #include <cuda_runtime_api.h>
 #include <cuda_runtime.h>
 
-#include<cstdio>
+
+#include <cstdio>
 #include <cmath>
-#include<cstdlib>
-#include<iostream>
+#include <cstdlib>
+#include <iostream>
 #include <iomanip>
 
 #include <benchmark/benchmark.h>
