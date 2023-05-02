@@ -4,6 +4,7 @@ project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Guard against in-source builds and bad build-type strings
 #include(ConfigSafeGuards)

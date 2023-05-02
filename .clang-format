@@ -1,0 +1,12 @@
+﻿---
+BasedOnStyle: Google
+AccessModifierOffset: '-4'
+AlignAfterOpenBracket: Align
+ColumnLimit: '160'
+Cpp11BracedListStyle: 'true'
+Language: Cpp
+Standard: Cpp11
+TabWidth: '4'
+UseTab: Never
+
+...
