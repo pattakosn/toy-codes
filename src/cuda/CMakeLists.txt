@@ -1,5 +1,5 @@
 if(NOT CMAKE_CUDA_COMPILER)
-    message(WARNING "CUDA not found, skipping cuda test")
+    message(STATUS "[CUDA] not found, skipping cuda test")
 else()
     add_executable(cuda_test nvidia-seperate-compilation.cu particle.cu particle.h v3.cu v3.h)
     set_target_properties(cuda_test
