@@ -1,7 +1,8 @@
 # bale kai ena cpp me ekeino to problhma poy koitoyses shmera: string trimming white space
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.26)
+set(CMAKE_TOOLCHAIN_FILE "/opt/vcpkg/scripts/buildsystems/vcpkg.cmake")
 project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy codes" LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -34,17 +35,19 @@ find_package(Boost REQUIRED)
 find_package(benchmark CONFIG REQUIRED)
 find_package(Eigen3 CONFIG REQUIRED)
 find_package(OpenMP REQUIRED)
+find_package(MKL CONFIG REQUIRED)
+#target_link_libraries(main PRIVATE MKL::MKL)
 
 include(CheckLanguage)
 check_language(CUDA)
 if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     if(NOT DEFINED CMAKE_CUDA_STANDARD)
-        set(CMAKE_CUDA_STANDARD 20)
+        set(CMAKE_CUDA_STANDARD 17)
 	set(CMAKE_CUDA_STANDARD_REQUIRED ON)
     endif()
     set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-    set(CMAKE_CUDA_ARCHITECTURES native)
+    set(CMAKE_CUDA_ARCHITECTURES "75") #native
     #CMAKE_CUDA_FLAGS to –cudart { none | shared | static }
     #set(CMAKE_CUDA_FLAGS "-Wall")
 

@@ -4,11 +4,11 @@ else()
     add_executable(cuda_test nvidia-seperate-compilation.cu particle.cu particle.h v3.cu v3.h)
     set_target_properties(cuda_test
         PROPERTIES
-        CUDA_ARCHITECTURES native
+        CUDA_ARCHITECTURES "60;70"
         CUDA_SEPARABLE_COMPILATION ON
         POSITION_INDEPENDENT_CODE ON
-        CXX_STANDARD 20
-        CUDA_STANDARD 20
+        CXX_STANDARD 17
+        CUDA_STANDARD 17
     )
     target_include_directories(cuda_test
 	     PRIVATE
@@ -35,18 +35,10 @@ else()
 
     add_executable(bench_cuda_init_to_0 simple-bench.cu)
     target_link_libraries(bench_cuda_init_to_0 PRIVATE benchmark::benchmark benchmark::benchmark_main)
-    set_target_properties(bench_cuda_init_to_0
-        PROPERTIES
-        CUDA_ARCHITECTURES native
-    )
 
 
     add_executable(bench_cuda_grid_stride grid-stride.cu)
     target_link_libraries(bench_cuda_grid_stride PRIVATE benchmark::benchmark benchmark::benchmark_main)
-    set_target_properties(bench_cuda_grid_stride
-        PROPERTIES
-        CUDA_ARCHITECTURES native
-    )
 
     add_executable(cuda_mandelbrot cuda_mandelbrot.cu)
     #target_link_libraries(cuda_mandelbrot PRIVATE benchmark::benchmark benchmark::benchmark_main)

@@ -4,12 +4,16 @@
   "builtin-baseline" : "716c3524a54f1f50a25d16a4cdd360f5a7fcc150",
   "dependencies" : [ {
     "name" : "benchmark",
-    "version>=" : "1.7.1"
+    "version>=" : "1.8.0"
   }, {
     "name" : "eigen3",
+    "platform": "windows",
     "version>=" : "3.4.0#2"
   }, {
     "name" : "boost-algorithm",
+    "platform": "windows",
     "version>=" : "1.81.0#2"
+  }, {
+    "name" : "intel-mkl",
   } ]
 }
