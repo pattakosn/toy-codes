@@ -26,6 +26,10 @@ RUN apt-get -y --no-install-recommends install \
     mesa-vulkan-drivers \
     nvidia-cuda-toolkit
 
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list && \
+    apt-get update && apt-get install -y intel-oneapi-mkl intel-oneapi-mkl-devel
+
 RUN mkdir /opt/vcpkg && \
     git clone https://github.com/microsoft/vcpkg /opt/vcpkg && \
     /opt/vcpkg/bootstrap-vcpkg.sh && \

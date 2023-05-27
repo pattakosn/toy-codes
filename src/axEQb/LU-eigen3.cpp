@@ -22,16 +22,16 @@
 // 	std::cout << "b( " << DIM/2 << " )=" << b(DIM / 2) << std::endl << std::endl;
 // }
 #include <benchmark/benchmark.h>
-
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/LU>
 
 using namespace Eigen;
+
 // NIKOS TODO: possibly compare LU implementations? eg mkl, openblas, etc
-static void AxEQb_LU(benchmark::State &state) {
+static void LU_EIGEN(benchmark::State &state) {
   for (auto _ : state) {
     // omp_set_num_threads(state.range(1));
-    omp_set_num_threads(4);
+    omp_set_num_threads(6);
     size_t DIM = state.range(0);
     MatrixXd A = MatrixXd::Random(DIM, DIM);
     VectorXd b = VectorXd::Random(DIM);
@@ -40,7 +40,7 @@ static void AxEQb_LU(benchmark::State &state) {
   }
 }
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->DenseRange(64, 4*1024, 64)->UseRealTime()->Unit(benchmark::kMillisecond)->Threads(4);
-BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 2 * 1024)->UseRealTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(LU_EIGEN)->RangeMultiplier(2)->Range(2*1024, 8 * 1024)->UseRealTime()->Unit(benchmark::kMillisecond);
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
