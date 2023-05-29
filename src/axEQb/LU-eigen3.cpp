@@ -22,6 +22,7 @@
 // 	std::cout << "b( " << DIM/2 << " )=" << b(DIM / 2) << std::endl << std::endl;
 // }
 #include <benchmark/benchmark.h>
+
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/LU>
 
@@ -40,7 +41,7 @@ static void LU_EIGEN(benchmark::State &state) {
   }
 }
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->DenseRange(64, 4*1024, 64)->UseRealTime()->Unit(benchmark::kMillisecond)->Threads(4);
-BENCHMARK(LU_EIGEN)->RangeMultiplier(2)->Range(2*1024, 8 * 1024)->UseRealTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(LU_EIGEN)->RangeMultiplier(2)->Range(2 * 1024, 8 * 1024)->UseRealTime()->Unit(benchmark::kMillisecond);
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
 // BENCHMARK(AxEQb_LU)->RangeMultiplier(2)->Range(1024, 8*1024)->Unit(benchmark::kMillisecond);
