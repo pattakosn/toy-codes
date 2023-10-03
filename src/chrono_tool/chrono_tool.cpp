@@ -1,5 +1,11 @@
 class nsp_time {
+
+  void nsp_time() { start(); }
+
+  void nsp_time(time_point<steady_clock time_p) : start{time_p}{ }
+
   void start() { now(start); };
+
   void end() {
     now(end);
     auto diff = end - start;
