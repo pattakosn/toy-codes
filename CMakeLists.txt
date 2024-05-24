@@ -1,6 +1,6 @@
 # bale kai ena cpp me ekeino to problhma poy koitoyses shmera: string trimming white space
 cmake_minimum_required(VERSION 3.26)
-set(CMAKE_TOOLCHAIN_FILE "/opt/vcpkg/scripts/buildsystems/vcpkg.cmake")
+set(CMAKE_TOOLCHAIN_FILE "/home/pattakosn/github.com/vcpkg/scripts/buildsystems/vcpkg.cmake")
 project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy codes" LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -31,6 +31,9 @@ if(    NOT cmake_build_type_tolower STREQUAL "debug"
    AND NOT cmake_build_type_tolower STREQUAL "relwithdebinfo")
       message(FATAL_ERROR "Unknown build type \"${CMAKE_BUILD_TYPE}\". Allowed values are Debug, Release, Profile, RelWithDebInfo (case-insensitive).")
 endif()
+
+include(CMakePrintHelpers)
+cmake_print_variables(CMAKE_BUILD_TYPE)
 
 #NIKOS include(CTest)
 
