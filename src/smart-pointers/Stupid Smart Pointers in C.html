@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta charset="utf-8">
+    <title>Stupid Smart Pointers in C</title>
+    <meta name="description" content="Stupid Smart Pointers in C">
+    <meta name="author" content="Kevin Albertson">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="icon" href="https://blog.kevinalbs.com/img/favicon.png" type="image/png">
+    <link rel="stylesheet" href="Stupid%20Smart%20Pointers%20in%20C_files/style.css">
+    <link rel="stylesheet" href="Stupid%20Smart%20Pointers%20in%20C_files/atom-one-dark.css">
+    <script async="" src="Stupid%20Smart%20Pointers%20in%20C_files/analytics.js"></script><script src="Stupid%20Smart%20Pointers%20in%20C_files/highlight.pack.js"></script>
+
+    <style type="text/css">
+    </style>
+    <!--[if lt IE 9]>
+    <script src='http://html5shiv.googlecode.com/svn/trunk/html5.js'></script>
+    <![endif]-->
+<style>:is([id*='google_ads_iframe'],[id*='taboola-'],.taboolaHeight,.taboola-placeholder,#top-ad,#credential_picker_container,#credentials-picker-container,#credential_picker_iframe,[id*='google-one-tap-iframe'],#google-one-tap-popup-container,.google-one-tap__module,.google-one-tap-modal-div,#amp_floatingAdDiv,#ez-content-blocker-container) {display:none!important;min-height:0!important;height:0!important;}</style><link type="text/css" rel="stylesheet" id="dark-mode-custom-link"><link type="text/css" rel="stylesheet" id="dark-mode-general-link"><style lang="en" type="text/css" id="dark-mode-custom-style"></style><style lang="en" type="text/css" id="dark-mode-native-style"></style><style lang="en" type="text/css" id="dark-mode-native-sheet"></style></head>
+
+<body>
+    <article id="container">
+        <header>
+            <div id="post-meta">
+                <span id="post-date">March 18, 2018</span>
+                <span id="post-author">By <a href="http://kevinalbs.com/">Kevin Albertson</a></span>
+            </div>
+            <h1>Stupid Smart Pointers in C</h1>
+            <h2><a href="https://github.com/kevinAlbs/SmartPointer">[GitHub repository]</a></h2>
+        </header>
+        <main>
+<p>Managing memory in C is difficult and error prone. C++ solves this with smart pointers like <code>std::unique_ptr</code> and <code>std::shared_ptr</code>.
+ This article demonstrates a proof-of-concept (aka stupid) smart pointer
+ in C with very little code. Along the way we'll look at the layout of 
+the 32-bit x86 call stack and write assembly in a C program.</p>
+
+<!-- TODO: make php functions for section headings. -->
+<h3 id="Managing_Memory_in_C"><a href="#Managing_Memory_in_C">§1 Managing Memory in C</a></h3>
+<p>In C, heap memory is allocated with a call to <code>malloc</code> and deallocated with a call to <code>free</code>.
+ It is the programmer's responsibility to free allocated memory when no 
+longer in use. Otherwise, memory leaks grow the program's memory usage, 
+exhausting valuable system resources.</p>
+
+<p>Sometimes knowing where to call <code>free</code> is clear.</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-keyword">char</span> *data = (<span class="hljs-keyword">char</span> *) <span class="hljs-built_in">malloc</span> (<span class="hljs-number">100</span>);
+<span class="hljs-comment">// do something with data, don't need it anymore</span>
+<span class="hljs-built_in">free</span> (data);</code></pre>
+<p>But even simple cases may be difficult to properly free. For example, suppose a function <code>f</code> allocates resources in order and frees them before returning.</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">char</span> *resource_1 = get_resource ();
+   <span class="hljs-keyword">if</span> (resource_1 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span>;
+
+   <span class="hljs-keyword">char</span> *resource_2 = get_resource ();
+   <span class="hljs-keyword">if</span> (resource_2 == <span class="hljs-literal">NULL</span>) {
+      <span class="hljs-built_in">free</span> (resource_1);
+      <span class="hljs-keyword">return</span>;
+   }
+
+   <span class="hljs-keyword">char</span> *resource_3 = get_resource ();
+   <span class="hljs-keyword">if</span> (resource_3 == <span class="hljs-literal">NULL</span>) {
+      <span class="hljs-built_in">free</span> (resource_2);
+      <span class="hljs-built_in">free</span> (resource_1);
+      <span class="hljs-keyword">return</span>;
+   }
+
+   <span class="hljs-comment">// etc.</span>
+}</code></pre>
+<p>Each return must free everything previously allocated. The list of calls to <code>free</code>
+ grows for every additional resource allocated. There are ways to 
+organize this to reduce some redundancy. But the root of the problem 
+remains: the lifetime of the allocated resource is bound to where <code>f</code> returns. Whenever <code>f</code> returns, we need to guarantee all of these resources are freed.</p>
+
+<p>A nice solution in C is described in Eli Bendersky's article: <a href="https://eli.thegreenplace.net/2009/04/27/using-goto-for-error-handling-in-c">Using goto for error handling in C</a>. This uses the goto statement and places all free calls at the end of the function.</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">char</span> *resource_1 = <span class="hljs-literal">NULL</span>, *resource_2 = <span class="hljs-literal">NULL</span>, *resource_3 = <span class="hljs-literal">NULL</span>;
+   resource_1 = get_resource ();
+   <span class="hljs-keyword">if</span> (resource_1 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span>;
+
+   resource_2 = get_resource ();
+   <span class="hljs-keyword">if</span> (resource_2 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">goto</span> free_resource_1;
+
+   resource_3 = get_resource ();
+   <span class="hljs-keyword">if</span> (resource_3 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">goto</span> free_resource_2;
+
+<span class="hljs-comment">// etc.</span>
+
+free_resource_2:
+   <span class="hljs-built_in">free</span> (resource_2); <span class="hljs-comment">// fall through</span>
+free_resource_1:
+   <span class="hljs-built_in">free</span> (resource_1);
+   <span class="hljs-keyword">return</span>;
+}</code></pre>
+<p>But C++ has an even better solution. Since objects have destructors, 
+we can explicitly bind the lifetime of a pointer to the lifetime of an 
+object.</p>
+
+<pre><code class="cpp hljs"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">auto</span> resource_1 = <span class="hljs-built_in">std</span>::<span class="hljs-built_in">unique_ptr</span>&lt;<span class="hljs-keyword">char</span>&gt; (get_resource ());
+   <span class="hljs-keyword">if</span> (resource_1.get () == <span class="hljs-literal">nullptr</span>) <span class="hljs-keyword">return</span>;
+   <span class="hljs-keyword">auto</span> resource_2 = <span class="hljs-built_in">std</span>::<span class="hljs-built_in">unique_ptr</span>&lt;<span class="hljs-keyword">char</span>&gt; (get_resource ());
+   <span class="hljs-keyword">if</span> (resource_2.get () == <span class="hljs-literal">nullptr</span>) <span class="hljs-keyword">return</span>;
+   <span class="hljs-keyword">auto</span> resource_3 = <span class="hljs-built_in">std</span>::<span class="hljs-built_in">unique_ptr</span>&lt;<span class="hljs-keyword">char</span>&gt; (get_resource ());
+   <span class="hljs-keyword">if</span> (resource_3.get () == <span class="hljs-literal">nullptr</span>) <span class="hljs-keyword">return</span>;
+   <span class="hljs-comment">/* ... */</span>
+}</code></pre>
+<p>The <code>unique_ptr</code> object wraps around the allocated pointer, and frees it when the <code>unique_ptr</code> goes out of scope.</p>
+
+<p>Unfortunately, C has no destructors we can hook onto, so there are no
+ native smart pointers. But we can create a surprisingly simple 
+approximation.</p>
+
+<h3 id="Implementation"><a href="#Implementation">§2 Implementation</a></h3>
+<p>The smart pointer will only consist of one function, <code>free_on_exit</code>,
+ to free the passed pointer when the current function returns. This will
+ allow us to rewrite our above example without any calls to <code>free</code>.</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">char</span> *resource_1 = free_on_exit (get_resource ());
+   <span class="hljs-keyword">if</span> (resource_1 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span>;
+
+   <span class="hljs-keyword">char</span> *resource_2 = free_on_exit (get_resource ());
+   <span class="hljs-keyword">if</span> (resource_2 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span>;
+
+   <span class="hljs-keyword">char</span> *resource_3 = free_on_exit (get_resource ());
+   <span class="hljs-keyword">if</span> (resource_3 == <span class="hljs-literal">NULL</span>) <span class="hljs-keyword">return</span>;
+}</code></pre>
+<p>Wherever <code>f</code> returns, it frees everything allocated before. But how can we possibly implement <code>free_on_exit</code>? How can we know when <code>f</code> returns and free all previous allocations? The trick is to manipulate the call stack. Instead of <code>f</code> returning to its original caller, we can manipulate the stack to have it return to our own custom function.</p>
+
+<h3 id="The_Call_Stack"><a href="#The_Call_Stack">§2.1 The Call Stack</a></h3>
+<p>Let's refresh on what the call stack looks like. The layout of the 
+call stack depends on the architecture. We'll use 32 bit x86 as our 
+target architecture (which has a simpler layout and calling conventions 
+than 64 bit). Eli Bendersky has another great article, <a href="https://eli.thegreenplace.net/2011/02/04/where-the-top-of-the-stack-is-on-x86/">Where the top of the stack is on x86</a>, with more depth, but the following is a brief overview.</p>
+
+<p>Here's an example of what the stack looks like when function <code>main</code> calls function <code>sum</code> in 32 bit x86 architecture.</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">sum</span> <span class="hljs-params">(<span class="hljs-keyword">int</span> x, <span class="hljs-keyword">int</span> y)</span> </span>{
+   <span class="hljs-keyword">int</span> z = x + y;
+   <span class="hljs-keyword">return</span> z;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">int</span> value = sum (<span class="hljs-number">2</span>, <span class="hljs-number">3</span>);
+}</code></pre>
+<figure>
+<img width="100%" src="Stupid%20Smart%20Pointers%20in%20C_files/function_call.svg">
+<figcaption>The call stack during a function call.</figcaption>
+</figure>
+
+<p>During a function call, the caller and callee split the responsibilities of what data to push onto the stack. The caller <code>main</code> is responsible for saving the current <code>eip</code>, but the callee <code>f</code> is responsible for saving the current <code>ebp</code>.</p>
+
+<h3 id="Hijacking_a_Return_Address"><a href="#Hijacking_a_Return_Address">§2.2 Hijacking a Return Address</a></h3>
+<p>But how can the stack be modified in a C program? One way is to use 
+assembly to obtain stack addresses, and then change the values they 
+point to. The following uses inline assembly to change a function's 
+return address.</p>
+
+<figure>
+<pre><code class="c hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">hijacked</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"hijacked\n"</span>);
+}
+
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"f starts\n"</span>);
+
+   <span class="hljs-keyword">int</span> *base = <span class="hljs-literal">NULL</span>;
+   <span class="hljs-comment">// get the value of ebp.</span>
+   __asm__(<span class="hljs-string">"movl %%ebp, %0 \n"</span>
+           : <span class="hljs-string">"=r"</span>(base) <span class="hljs-comment">// output</span>
+           );
+
+   <span class="hljs-comment">// change the return address.</span>
+   *(base + <span class="hljs-number">1</span>) = (<span class="hljs-keyword">int</span>) hijacked;
+
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"f ends\n"</span>);
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"main starts\n"</span>);
+   f ();
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"main ends\n"</span>);
+}</code></pre><figcaption>hijack.c</figcaption>
+</figure>
+
+<p>To run this program:</p>
+<pre><code class="bash hljs">$ gcc -O0 hijack.c -m32 -o hijack
+$ ./hijack
+main starts
+f starts
+f ends
+hijacked
+Bus error: 10</code></pre>
+
+<p>We can see that <code>f</code> never returns to <code>main</code>, but instead to the hijacked function! How does this work?</p>
+
+<p>In <code>f</code>, we get the current value of the <code>ebp</code> register in <code>base</code> using the inline assembly function <code>__asm__</code>.</p>
+
+<pre><code class="c hljs cpp">__asm__ (
+<span class="hljs-string">"movl %%ebp, %0 \n"</span> 
+: <span class="hljs-string">"=r"</span> (base) <span class="hljs-comment">// output</span>
+);</code></pre>
+
+<p><code>"movl %%ebp, %0 \n"</code> is the assembly instruction we run. Registers are denoted with <code>%%</code>. The <code>%0</code> is a placeholder for the first output variable.</p>
+
+<p><code>: "=r" (base)</code> says use the C variable <code>base</code> as the first output variable. <code>"=r"</code> means store the operand in a register before copying to the output variable.</p>
+
+<p>For more information about <code>__asm__</code>, see the article <a href="http://ericw.ca/notes/a-tiny-guide-to-gcc-inline-assembly.html">A Tiny Guide to GCC Inline Assembly</a> by Eric Woroshow.</p>
+
+<p>Once we have the value of <code>ebp</code> in <code>base</code>, we can use it just like any pointer.</p>
+
+<pre><code class="c hljs cpp">*(base + <span class="hljs-number">1</span>) = (<span class="hljs-keyword">int</span>) hijacked;</code></pre>
+
+<p>Since <code>base</code> is of type <code>int*</code> adding one increments the address by the size of an int (4 bytes in this case). Therefore, this line changes the saved <code>eip</code> on the stack from <code>main</code> to the address of the function <code>hijacked</code>.</p>
+
+<p>Note, after we return from <code>hijacked</code> there's an error (yours may be a segmentation fault). Next we'll see how to fix that error.</p>
+
+<h3 id="Restoring_the_Return_Address"><a href="#Restoring_the_Return_Address">§2.3 Restoring the Return Address</a></h3>
+<p>The example before ended with an error. When <code>hijacked</code> returns, there isn't an address to pop off of the stack, so it jumps to an invalid address.</p>
+
+<figure><img width="100%" src="Stupid%20Smart%20Pointers%20in%20C_files/hijack.svg"></figure>
+
+<p>The caller is responsible for pushing the return address. When we jump directly to <code>hijacked</code> we bypass the usual call convention.</p>
+
+<p>Instead we want <code>hijacked</code> to return back to the original return address in <code>main</code>. To do so we can use a pure assembly function to avoid the typical function call and return sequence of a compiled C function.</p>
+
+<figure>
+<pre><code class="x86 hljs bash">.section .text
+.globl trampoline
+.<span class="hljs-built_in">type</span> trampoline, @<span class="hljs-keyword">function</span>
+trampoline:
+<span class="hljs-comment"># call hijacked. This pushes the address of the next instruction.</span>
+<span class="hljs-comment"># when hijacked returns, we jump directly to the address in eax.</span>
+<span class="hljs-comment"># eax contains the returned value of hijacked.</span>
+call hijacked
+jmp %eax</code></pre><figcaption>trampoline.S</figcaption>
+</figure>
+
+<p>This assembly function named <code>trampoline</code> bypasses the usual call sequence generated by compiling a C function. Instead of popping a return address to return to, we <code>jmp</code> directly to the value stored in <code>eax</code>. The value returned by <code>hijacked</code> is stored in <code>eax</code>. We modify <code>hijacked</code> and <code>f</code> as follows:</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-comment">// forward declare the assembly trampoline.</span>
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">trampoline</span> <span class="hljs-params">()</span></span>;
+<span class="hljs-keyword">int</span> return_address;
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">hijacked</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"hijacked\n"</span>);
+   <span class="hljs-keyword">return</span> return_address;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"f starts\n"</span>);
+
+   <span class="hljs-keyword">int</span> *base;
+   <span class="hljs-comment">// get the value of the ebp.</span>
+   __asm__(<span class="hljs-string">"movl %%ebp, %0 \n"</span>
+           : <span class="hljs-string">"=r"</span>(base) <span class="hljs-comment">// output</span>
+           );
+
+   <span class="hljs-comment">// save the return address.</span>
+   return_address = *(base + <span class="hljs-number">1</span>);
+   <span class="hljs-comment">// change the return address.</span>
+   *(base + <span class="hljs-number">1</span>) = (<span class="hljs-keyword">int</span>) trampoline;
+
+   <span class="hljs-built_in">printf</span> (<span class="hljs-string">"f ends\n"</span>);
+}
+</code></pre>
+<p>Compile and run with:</p>
+<pre><code class="bash hljs">$ gcc -o hijack -O0 -m32 hijack.c trampoline.S
+$ ./hijack
+main starts
+f starts
+f ends
+hijacked 
+main ends</code></pre>
+
+<p>Now our hijacked function restores the original return address after 
+executing. We'll use this same technique to implement our smart pointer.</p>
+
+<h3 id="One_Smart_Pointer"><a href="#One_Smart_Pointer">§2.4 One Smart Pointer</a></h3><p>We're one small step away from creating a smart pointer. Let's rename <code>hijacked</code> to <code>do_free</code>, and add the function <code>free_on_exit</code>, which now hijacks the <em>caller's</em> return address.</p>
+
+<pre><code class="c hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdio.h&gt;</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdlib.h&gt;</span></span>
+<span class="hljs-comment">/* forward declare the assembly trampoline. */</span>
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">trampoline</span> <span class="hljs-params">()</span></span>;
+<span class="hljs-keyword">int</span> return_address;
+<span class="hljs-keyword">void</span> *tracked_pointer;
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">do_free</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-built_in">free</span> (tracked_pointer);
+   <span class="hljs-keyword">return</span> return_address;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">void</span> *<span class="hljs-title">free_on_exit</span> <span class="hljs-params">(<span class="hljs-keyword">void</span> *ptr)</span> </span>{
+   <span class="hljs-keyword">int</span> *base;
+   <span class="hljs-comment">// get the value of the caller's ebp by dereferencing ebp.</span>
+   __asm__(<span class="hljs-string">"movl (%%ebp), %0 \n"</span>
+           : <span class="hljs-string">"=r"</span>(base) <span class="hljs-comment">// output</span>
+           );
+
+   <span class="hljs-comment">// save and change the caller's return address.</span>
+   return_address = *(base + <span class="hljs-number">1</span>);
+   *(base + <span class="hljs-number">1</span>) = (<span class="hljs-keyword">int</span>) trampoline;
+   <span class="hljs-keyword">return</span> ptr;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">f</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">char</span> *resource = free_on_exit (<span class="hljs-built_in">malloc</span> (<span class="hljs-number">1</span>));
+}
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span> <span class="hljs-params">()</span> </span>{
+   f ();
+}</code></pre>
+<p>Calling <code>free_on_exit</code> stores the passed pointer and sets the caller's return address to <code>trampoline</code>. After the caller <code>f</code> returns, it automatically frees its <code>malloc</code>'ed byte. We now have a smart pointer!</p>
+
+<h3 id="Many_Smart_Pointers"><a href="#Many_Smart_Pointers">§2.5 Many Smart Pointers</a></h3>
+<p>The <code>free_on_exit</code> above is only a single-use function. If
+ called multiple times, it only frees the pointer passed in the most 
+recent call. Fortunately, it's only another small step to make <code>free_on_exit</code> work with any number of repeated calls.</p>
+
+<p>To do so we can store a list of tracked pointers for each function 
+call. Stack these lists, and each time a new function calls 
+free_on_exit, add a new stack entry. When do_free is called, it frees 
+the list of pointers on the top most entry of the stack.</p>
+
+<p>At the risk of including too much code in this article, here is the full implementation in under one hundred lines of code:</p>
+
+<figure>
+    <pre><code class="c hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">ifndef</span> _SMART</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> _SMART</span>
+<span class="hljs-function"><span class="hljs-keyword">void</span> *<span class="hljs-title">free_on_exit</span> <span class="hljs-params">(<span class="hljs-keyword">void</span> *)</span></span>;
+<span class="hljs-meta">#<span class="hljs-meta-keyword">endif</span></span></code></pre>    <figcaption>smart.h</figcaption>
+</figure>
+<figure>
+    <pre><code class="c hljs cpp"><span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">"smart.h"</span></span>
+
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;stdlib.h&gt; // free</span></span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">include</span> <span class="hljs-meta-string">&lt;string.h&gt; // memset</span></span>
+
+<span class="hljs-comment">/* these limits are arbitrary. */</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> STACK_SIZE 256</span>
+<span class="hljs-meta">#<span class="hljs-meta-keyword">define</span> MAX_PER_FRAME 32</span>
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+   <span class="hljs-keyword">int</span> caller_ebp; <span class="hljs-comment">/* ebp of the caller. This identifes the frame. */</span>
+   <span class="hljs-keyword">int</span> caller_eip; <span class="hljs-comment">/* the original return eip of the caller. */</span>
+   <span class="hljs-keyword">void</span> *tracked_pointers[MAX_PER_FRAME];
+   <span class="hljs-keyword">int</span> tail; <span class="hljs-comment">/* points to one past last entry. */</span>
+} <span class="hljs-keyword">tracked_stack_entry_t</span>;
+
+<span class="hljs-keyword">typedef</span> <span class="hljs-class"><span class="hljs-keyword">struct</span> {</span>
+   <span class="hljs-keyword">tracked_stack_entry_t</span> <span class="hljs-built_in">stack</span>[STACK_SIZE];
+   <span class="hljs-keyword">int</span> tail; <span class="hljs-comment">/* points to one past last entry. */</span>
+} <span class="hljs-keyword">tracked_stack_t</span>;
+
+<span class="hljs-comment">/* forward declare the assembly trampoline. */</span>
+<span class="hljs-function"><span class="hljs-keyword">void</span> <span class="hljs-title">trampoline</span> <span class="hljs-params">()</span></span>;
+
+<span class="hljs-keyword">tracked_stack_t</span> tracked = {<span class="hljs-number">0</span>};
+
+<span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">do_free</span> <span class="hljs-params">()</span> </span>{
+   <span class="hljs-keyword">tracked_stack_entry_t</span> *entry = tracked.<span class="hljs-built_in">stack</span> + (tracked.tail - <span class="hljs-number">1</span>);
+   tracked.tail--; <span class="hljs-comment">/* pop. */</span>
+   <span class="hljs-keyword">for</span> (<span class="hljs-keyword">int</span> i = <span class="hljs-number">0</span>; i &lt; MAX_PER_FRAME; i++) {
+      <span class="hljs-keyword">if</span> (entry-&gt;tracked_pointers[i] == <span class="hljs-number">0</span>) <span class="hljs-keyword">break</span>;
+      <span class="hljs-built_in">free</span> (entry-&gt;tracked_pointers[i]);
+   }
+   <span class="hljs-keyword">return</span> entry-&gt;caller_eip;
+}
+
+<span class="hljs-function"><span class="hljs-keyword">void</span> *<span class="hljs-title">free_on_exit</span> <span class="hljs-params">(<span class="hljs-keyword">void</span> *entry)</span> </span>{
+   <span class="hljs-keyword">int</span> ret_addr = <span class="hljs-number">0</span>;
+   <span class="hljs-keyword">int</span> do_free_addr = (<span class="hljs-keyword">int</span>) &amp;do_free;
+   <span class="hljs-keyword">int</span> *caller_ebp;
+
+   <span class="hljs-comment">/* get the value of ebp. */</span>
+   __asm__(<span class="hljs-string">"movl (%%ebp), %0 \n"</span>
+           : <span class="hljs-string">"=r"</span>(caller_ebp) <span class="hljs-comment">/* output. */</span>
+           );
+
+   <span class="hljs-comment">/* check if there is a pre-existing stack entry for this caller
+    * (identified by caller's ebp). */</span>
+   <span class="hljs-keyword">tracked_stack_entry_t</span> *tracked_entry;
+
+   <span class="hljs-keyword">if</span> (tracked.tail &gt; <span class="hljs-number">0</span> &amp;&amp;
+       tracked.<span class="hljs-built_in">stack</span>[tracked.tail - <span class="hljs-number">1</span>].caller_ebp == (<span class="hljs-keyword">int</span>) caller_ebp) {
+      <span class="hljs-comment">/* re-use. */</span>
+      tracked_entry = tracked.<span class="hljs-built_in">stack</span> + tracked.tail - <span class="hljs-number">1</span>;
+   } <span class="hljs-keyword">else</span> {
+      <span class="hljs-comment">/* make a new entry. */</span>
+      tracked_entry = tracked.<span class="hljs-built_in">stack</span> + tracked.tail++;
+      <span class="hljs-built_in">memset</span> (tracked_entry, <span class="hljs-number">0</span>, <span class="hljs-keyword">sizeof</span> (*tracked_entry));
+      tracked_entry-&gt;caller_ebp = (<span class="hljs-keyword">int</span>) caller_ebp;
+      <span class="hljs-comment">/* hijack caller's return eip to return to do_free. */</span>
+      tracked_entry-&gt;caller_eip = *(caller_ebp + <span class="hljs-number">1</span>);
+      *(caller_ebp + <span class="hljs-number">1</span>) = (<span class="hljs-keyword">int</span>) trampoline;
+   }
+
+   <span class="hljs-comment">/* push the passed pointer. */</span>
+   tracked_entry-&gt;tracked_pointers[tracked_entry-&gt;tail++] = entry;
+   <span class="hljs-keyword">return</span> entry;
+}</code></pre>    <figcaption>smart.c</figcaption>
+</figure>
+<figure>
+    <pre><code class="c hljs cpp"># This can be compiled by itself with `as -<span class="hljs-number">-32</span>`
+# <span class="hljs-function">This is GNU assembler <span class="hljs-title">syntax</span> <span class="hljs-params">(aka AT-T syntax)</span> <span class="hljs-params">(src, dest)</span>
+.section .text
+.globl trampoline 
+.type trampoline, @function
+trampoline:
+call do_free
+jmp %eax <span class="hljs-meta"># jump directly back to the old eip.</span></span></code></pre>    <figcaption>trampoline.S</figcaption>
+</figure>
+
+<p>Additionally, the code is in a <a href="https://github.com/kevinAlbs/SmartPointer">GitHub repository</a>.</p>
+
+<h3 id="Conclusion"><a href="#Conclusion">§3 Conclusion</a></h3> 
+<p>In this article we've shown how to build a simple and incomplete 
+smart pointer on an 32 bit x86 architecture. We've looked at the call 
+stack, hijacked return addresses, and written some assembly in the 
+process.</p>
+
+<p>I recently discovered the implementation of <code>free_on_exit</code> won't work if called directly from <code>main</code> if gcc aligns the stack. In this case, <code>main</code> adds padding between the saved <code>eip</code> and the saved <code>ebp</code>, <a href="https://stackoverflow.com/q/4228261/774658">(example)</a>. I think this can be fixed some tweaking, and will update this article when it is fixed.</p>
+
+<p>For more reading, check out the following articles:</p>
+<ul>
+<li><a href="https://github.com/Snaipe/libcsptr">libcsptr</a> a full-fledged smart pointer library written in C</li>
+<li><a href="http://ericw.ca/notes/a-tiny-guide-to-gcc-inline-assembly.html">A Guide to inline Assembly</a> by Eric Woroshow</li>
+<li><a href="https://eli.thegreenplace.net/2011/02/04/where-the-top-of-the-stack-is-on-x86/">Where the top of the stack is on x86</a> by Eli Bendersky</li>
+<li><a href="https://eli.thegreenplace.net/2011/09/06/stack-frame-layout-on-x86-64">Stack frame layout on x86-64</a> by Eli Bendersky</li>
+<li><a href="https://eli.thegreenplace.net/2009/04/27/using-goto-for-error-handling-in-c">Using goto for error handling in C</a> by Eli Bendersky</li>
+</ul>
+
+
+<script>
+        hljs.initHighlightingOnLoad();
+    </script>
+    <!-- Google Analytics -->
+    <script>
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+    ga('create', 'UA-37996372-11', 'auto');
+    ga('send', 'pageview');
+    </script>
+
+</main></article><deepl-input-controller translate="no"></deepl-input-controller></body></html>
