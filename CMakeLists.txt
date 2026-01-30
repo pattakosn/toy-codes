@@ -1,10 +1,10 @@
 # bale kai ena cpp me ekeino to problhma poy koitoyses shmera: string trimming white space
-cmake_minimum_required(VERSION 3.26)
-set(CMAKE_TOOLCHAIN_FILE "/home/pattakosn/github.com/vcpkg/scripts/buildsystems/vcpkg.cmake")
+cmake_minimum_required(VERSION 3.30)
+#set(CMAKE_TOOLCHAIN_FILE "/home/pattakosn/github.com/vcpkg/scripts/buildsystems/vcpkg.cmake")
 project(benchmarking_toy_codes DESCRIPTION "Use google benchmark to measure toy codes" LANGUAGES C CXX)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Guard against in-source builds and bad build-type strings

@@ -1,5 +1,6 @@
 add_subdirectory(axEQb)
 add_subdirectory(cuda)
-add_subdirectory(simd)
+add_subdirectory(sdl3-imgui)
+#add_subdirectory(simd)
 add_subdirectory(string_trim)
 add_subdirectory(vulkan-compute)
