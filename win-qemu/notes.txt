@@ -1,0 +1,83 @@
+qemu-img create -f qcow2 win10.img 150G
+
+cp /usr/share/OVMF/OVMF_VARS_4M.fd ../OVMF_VARS_4M.fd
+cp /usr/share/OVMF/OVMF_ ../OVMF_VARS_4M.fd
+
+sudo qemu-system-x86_64 -enable-kvm -m 8G -smp 24 -cpu host -drive if=pflash,format=raw,readonly=on,file=../OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=../OVMF_VARS_4M.fd -drive file=~/gitlab/WindowsVM/VM/win11.qcow2,format=qcow2,if=virtio -cdrom ~/gitlab/WindowsVM/Win11_24H2_English_x64.iso -drive file=~/gitlab/WindowsVM/virtio-win-0.1.271.iso,media=cdrom -boot d -vga virtio
+
+shift+f10 regedit, HKEY_LOCAL_MACHINE\SYSTEM\Setup \LabConfig BypassTPMCheck,BypassSecureBootCheck,BypassRAMCheck to 1
+or install w10 then upgrade
+or use swtpm sw tpm emu + -chardev socket,id=chrtpm,path=/tmp/swtpm-sock -tpmdev emulator,id=tpm0,chardev=chrtpm -device tpm-tis,tpmdev=tpm0
+sudo apt install wimtools
+that was a bummer, managed to do it with claude + 
+```
+mkdir ~/w11_modified
+cd ~/w11_modified
+7z x ~/wvm/install.iso
+
+cd ~/w11_modified
+cat > autounattend.xml << 'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+    <settings pass="windowsPE">
+        <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+            <RunSynchronous>
+                <RunSynchronousCommand wcm:action="add">
+                    <Order>1</Order>
+                    <Path>reg add HKLM\SYSTEM\Setup\LabConfig /v BypassTPMCheck /t REG_DWORD /d 1 /f</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand wcm:action="add">
+                    <Order>2</Order>
+                    <Path>reg add HKLM\SYSTEM\Setup\LabConfig /v BypassSecureBootCheck /t REG_DWORD /d 1 /f</Path>
+                </RunSynchronousCommand>
+                <RunSynchronousCommand wcm:action="add">
+                    <Order>3</Order>
+                    <Path>reg add HKLM\SYSTEM\Setup\LabConfig /v BypassRAMCheck /t REG_DWORD /d 1 /f</Path>
+                </RunSynchronousCommand>
+            </RunSynchronous>
+        </component>
+    </settings>
+</unattend>
+EOF
+
+cd ~/w11_modified
+xorriso \
+  -outdev ../win11_modified.iso \
+  -volid "Win11_Modified" \
+  -compliance no_emul_toc \
+  -map . / \
+  -boot_image any efi_path=efi/microsoft/boot/efisys.bin \
+  -boot_image any platform_id=0xef \
+  -boot_image any emul_type=no_emulation \
+  -boot_image any next \
+  -boot_image any efi_path=boot/etfsboot.com \
+  -boot_image any platform_id=0x00 \
+  -boot_image any emul_type=no_emulation \
+  -boot_image any load_size=2048
+```
+during install load driver from virtio cd\viostor\w10\amd64
+disable internet connection requirement: shift+f10 kai meta OOBE\BYPASSNRO 
+OVMF_CODE_4M.fd
+OVMF_VARS_4M.fd
+Win11_24H2_English_x64.iso
+notes.txt
+virtio-win-0.1.271.iso
+win11_modified.iso
+
+VM:
+[0m[01;34m.[0m
+[01;34m..[0m
+win11.qcow2
+
+w11_mod:
+[01;34m.[0m
+[01;34m..[0m
+autorun.inf
+autounattend.xml
+[01;34mboot[0m
+bootmgr
+bootmgr.efi
+[01;34mefi[0m
+setup.exe
+[01;34msources[0m
+[01;34msupport[0m
